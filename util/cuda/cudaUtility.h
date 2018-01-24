@@ -94,7 +94,7 @@ inline cudaError_t cudaCheckError(cudaError_t retval, const char* txt, const cha
 	}
 
 	return retval;
-}
+}     
 
 
 /**

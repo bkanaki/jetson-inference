@@ -64,8 +64,10 @@ public:
 	inline uint32_t GetSize() const		  { return mSize; }
 	
 	// Default resolution, unless otherwise specified during Create()
-	static const uint32_t DefaultWidth  = 1280;
-	static const uint32_t DefaultHeight = 720;
+//	 static const uint32_t DefaultWidth  = 1280;
+//	 static const uint32_t DefaultHeight = 720;
+	static const uint32_t DefaultWidth = 640;
+	static const uint32_t DefaultHeight = 360;
 	
 private:
 	static void onEOS(_GstAppSink* sink, void* user_data);
@@ -105,9 +107,10 @@ private:
 	bool     mLatestRetrieved;
 	
 	void* mRGBA[NUM_RINGBUFFERS];
-	int   mV4L2Device;	// -1 for onboard, >=0 for V4L2 device
+	int   mV4L2Device;	// -1 for onboard, >=0 for V4L2 device, ==100 for video
 	
 	inline bool onboardCamera() const		{ return (mV4L2Device < 0); }
+	inline bool videoFile() const           { return (mV4L2Device == 100); }
 };
 
 #endif

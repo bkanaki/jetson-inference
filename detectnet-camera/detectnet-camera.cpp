@@ -36,7 +36,7 @@
 #include "detectNet.h"
 
 
-#define DEFAULT_CAMERA -1	// -1 for onboard camera, or change to index of /dev/video V4L2 camera (>=0)	
+#define DEFAULT_CAMERA 100	// -1 for onboard camera, or change to index of /dev/video V4L2 camera (>=0) except when 100 it means a video file
 		
 
 bool signal_recieved = false;
@@ -83,7 +83,7 @@ int main( int argc, char** argv )
 	/*
 	 * create the camera device
 	 */
-	gstCamera* camera = gstCamera::Create(DEFAULT_CAMERA);
+    gstCamera* camera = gstCamera::Create(DEFAULT_CAMERA, 1280, 720);
 	
 	if( !camera )
 	{
@@ -104,7 +104,7 @@ int main( int argc, char** argv )
 	
 	if( !net )
 	{
-		printf("detectnet-camera:   failed to initialize imageNet\n");
+		printf("detectnet-camera:   failed to initialize detectNet\n");
 		return 0;
 	}
 
@@ -187,6 +187,7 @@ int main( int argc, char** argv )
 		// classify image with detectNet
 		int numBoundingBoxes = maxBoxes;
 	
+	// passed imgCUDA instead of imgRGBA because we're already getting RGBA from pipeline
 		if( net->Detect((float*)imgRGBA, camera->GetWidth(), camera->GetHeight(), bbCPU, &numBoundingBoxes, confCPU))
 		{
 			printf("%i bounding boxes detected\n", numBoundingBoxes);

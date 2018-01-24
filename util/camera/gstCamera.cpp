@@ -29,7 +29,7 @@
 #include <sstream> 
 #include <unistd.h>
 #include <string.h>
-
+  
 #include <QMutex>
 #include <QWaitCondition>
 
@@ -121,7 +121,13 @@ bool gstCamera::ConvertRGBA( void* input, void** output, bool zeroCopy )
 		printf(LOG_CUDA "gstreamer camera -- allocated %u RGBA ringbuffers\n", NUM_RINGBUFFERS);
 	}
 	
-	if( onboardCamera() )
+	if (videoFile()) {
+	    // gst-pipeline with h264 decode generates NV12
+	    // printf("Comes here..\n");
+		if( CUDA_FAILED(cudaNV12ToRGBAf((uint8_t*)input, (float4*)mRGBA[mLatestRGBA], mWidth, mHeight)) )
+			return false;
+	}
+	else if( onboardCamera() )
 	{
 		// onboard camera is NV12
 		if( CUDA_FAILED(cudaNV12ToRGBAf((uint8_t*)input, (float4*)mRGBA[mLatestRGBA], mWidth, mHeight)) )
@@ -327,7 +333,46 @@ bool gstCamera::buildLaunchStr()
 //#define CAPS_STR "video/x-raw(memory:NVMM), width=(int)2592, height=(int)1944, format=(string)I420, framerate=(fraction)30/1"
 //#define CAPS_STR "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)30/1"
 
-	if( onboardCamera() )
+// Commented by Bhargav - starts
+// for video file
+    if ( videoFile() )
+    {
+		// correct - should use the RGBToRGBAf 
+//		ss << "filesrc location=/home/nvidia/DJI_0021_480.avi"
+//		<< " ! decodebin ! videoscale ! video/x-raw, format=(string)RGB, "
+//		<< "width=(int)" << mWidth << ", height=(int)" << mHeight
+//		<< " ! videoconvert ! appsink name=mysink";
+        
+//        ss << "filesrc location=/home/nvidia/video_data/P1220016.MOV"
+//		<< " ! decodebin"
+//		<< " ! nvivafilter customer-lib-name=libnvsample_cudaprocess.so cuda-process=true post-process=true"
+//		<< " ! nvvidconv ! video/x-raw(memory:NVMM), format=(string)NV12"
+//		<< ", width=(int)" << mWidth << ", height=(int)" << mHeight
+//		<< " ! nvvidconv ! video/x-raw, format=(string)NV12"
+//		<< " ! appsink name=mysink";
+        
+        // correct
+//		ss << "filesrc location=/home/nvidia/video_data/P1220016.MOV"
+//		<< " ! decodebin"
+//		<< " ! nvvidconv ! video/x-raw, format=(string)NV12"
+//		<< ", width=(int)" << mWidth << ", height=(int)" << mHeight
+//		<< " ! appsink name=mysink";
+		
+		// incorrect
+//		ss << "filesrc location=/home/nvidia/test.mp4 ! qtdemux name=demux demux.video_0 ! queue ! h264parse ! omxh264dec ! nvvidconv ! video/x-raw, format=I420 ! appsink name=mysink";
+        
+        // incorrect
+//		ss << "filesrc location=/home/nvidia/DJI_0021_480.avi";
+//		ss << " ! decodebin ! video/x-raw, format=(string)RGB ";
+//		ss << " ! appsink name=mysink";
+
+        ss << "rtspsrc location=rtsp://root:Motusing@192.168.0.90/axis-media/media.amp latency=100";
+        ss << " ! decodebin ! nvvidconv";
+        ss << " ! video/x-raw, width=" << mWidth << ", height=" << mHeight << ", ";
+        ss << "format=NV12 ! appsink name=mysink";
+	    
+    }
+	else if( onboardCamera() )
 	{
 	#if NV_TENSORRT_MAJOR > 1	// if JetPack 3.1 (different flip-method)
 		const int flipMethod = 0;
@@ -335,7 +380,8 @@ bool gstCamera::buildLaunchStr()
 		const int flipMethod = 2;
 	#endif
 	
-		ss << "nvcamerasrc fpsRange=\"30.0 30.0\" ! video/x-raw(memory:NVMM), width=(int)" << mWidth << ", height=(int)" << mHeight << ", format=(string)NV12 ! nvvidconv flip-method=" << flipMethod << " ! "; //'video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)30/1' ! ";
+		ss << "nvcamerasrc fpsRange=\"30.0 30.0\" ! video/x-raw(memory:NVMM), width=(int)" << mWidth << ", height=(int)" << mHeight << ", format=(string)NV12 ! nvvidconv flip-method=" << flipMethod << " ! "; 
+		//'video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)30/1' ! ";
 		ss << "video/x-raw ! appsink name=mysink";
 	}
 	else
@@ -345,7 +391,8 @@ bool gstCamera::buildLaunchStr()
 		ss << "format=RGB ! videoconvert ! video/x-raw, format=RGB ! videoconvert !";
 		ss << "appsink name=mysink";
 	}
-	
+	// * Modified by Bhargav - ends
+
 	mLaunchStr = ss.str();
 
 	printf(LOG_GSTREAMER "gstreamer decoder pipeline string:\n");
@@ -391,7 +438,7 @@ gstCamera* gstCamera::Create( int v4l2_device )
 }
 
 
-// init
+// init 
 bool gstCamera::init()
 {
 	GError* err = NULL;
